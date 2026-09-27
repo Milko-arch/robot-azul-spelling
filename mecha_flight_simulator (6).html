@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mecha Flight - Word Target Challenge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap');
+    
+    * {
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #030d22;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .hud-font {
+      font-family: 'Orbitron', monospace;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.45);
+    }
+    .text-glow {
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 210, 255, 0.5);
+    }
+    .glass-panel {
+      background: rgba(8, 20, 48, 0.8);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      box-shadow: 0 12px 35px rgba(0, 10, 30, 0.65), inset 0 0 15px rgba(0, 240, 255, 0.1);
+    }
+    .vignette {
+      background: radial-gradient(circle at center, transparent 65%, rgba(2, 6, 20, 0.45) 100%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden text-slate-100">
+
+  <!-- Interactive Flight Canvas -->
+  <canvas id="flightCanvas" class="absolute inset-0 w-full h-full block z-0 cursor-crosshair"></canvas>
+  <div class="vignette absolute inset-0 z-10 pointer-events-none"></div>
+
+  <!-- Top Center Target Word HUD Banner -->
+  <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none w-11/12 max-w-md">
+    <div class="glass-panel px-6 py-3 rounded-2xl flex items-center justify-between w-full pointer-events-auto border-cyan-400/40 glow-cyan">
+      <div class="flex items-center space-x-3">
+        <button id="repeatVoiceBtn" title="Listen again in English" class="w-10 h-10 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-400/50 flex items-center justify-center text-cyan-300 transition active:scale-95">
+          <i class="fa-solid fa-volume-high text-lg"></i>
+        </button>
+        <div>
+          <div class="text-[10px] tracking-widest text-cyan-300 font-bold hud-font">CATCH WITH HEAD:</div>
+          <div id="targetWordDisplay" class="hud-font text-2xl sm:text-3xl font-black tracking-wider text-cyan-200 text-glow">---</div>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4 border-l border-cyan-500/30 pl-4">
+        <div class="text-right">
+          <div class="text-[10px] tracking-widest text-emerald-400 font-bold hud-font">TARGETS</div>
+          <div class="hud-font text-2xl sm:text-3xl font-black text-emerald-300"><span id="scoreDisplay">0</span><span class="text-xs text-emerald-400/70">/32</span></div>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] tracking-widest text-amber-400 font-bold hud-font">TIME</div>
+          <div id="timerDisplay" class="hud-font text-lg sm:text-xl font-bold text-amber-300">00:00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5-Second Threat Timer Indicator -->
+    <div class="w-full mt-1.5 flex items-center space-x-2 px-3 py-1 bg-slate-900/80 rounded-full border border-cyan-500/30 text-[11px] hud-font">
+      <span class="text-rose-400 flex items-center gap-1"><i class="fa-solid fa-satellite-dish animate-pulse"></i> UFO ALERT:</span>
+      <div class="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+        <div id="ufoTimerBar" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 w-full transition-all duration-75"></div>
+      </div>
+      <span id="ufoTimerSeconds" class="text-cyan-300 font-bold w-7 text-right">5.0s</span>
+    </div>
+  </div>
+
+  <!-- Mission Accomplished Modal -->
+  <div id="victoryModal" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div class="glass-panel border-cyan-400/60 p-8 rounded-3xl max-w-md w-full text-center flex flex-col items-center glow-cyan">
+      <div class="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center text-cyan-300 mb-4 text-3xl shadow-lg shadow-cyan-500/50 animate-bounce">
+        <i class="fa-solid fa-trophy"></i>
+      </div>
+      <h2 class="hud-font text-3xl font-black text-cyan-200 tracking-wider text-glow mb-1">FOOTPRINTS</h2>
+      <p class="text-cyan-300/80 text-sm mb-4 font-semibold tracking-wide">MISSION COMPLETE · PILOT SUPREME</p>
+      
+      <div class="w-full bg-slate-900/90 rounded-2xl border border-cyan-500/30 p-4 mb-6 text-left space-y-2">
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400 font-medium">Targets Destroyed:</span>
+          <span class="hud-font text-emerald-400 font-bold">32 / 32 WORDS</span>
+        </div>
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400 font-medium">Mission Duration:</span>
+          <span id="victoryTimeDisplay" class="hud-font text-amber-300 font-bold text-lg">00:00</span>
+        </div>
+      </div>
+
+      <button id="restartBtn" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold hud-font tracking-wider shadow-lg shadow-cyan-500/40 transition transform active:scale-95 flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-rotate-right"></i>
+        <span>PLAY AGAIN</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Top Right Flight Controls -->
+  <header class="absolute top-4 right-4 z-20 flex justify-end items-center pointer-events-none">
+    <div class="flex items-center space-x-2 pointer-events-auto">
+      <button id="soundToggle" class="glass-panel hover:bg-cyan-950/80 text-cyan-300 px-3.5 py-2.5 rounded-xl transition flex items-center space-x-2 text-sm shadow-md">
+        <i class="fa-solid fa-volume-high" id="soundIcon"></i>
+        <span class="hidden sm:inline font-semibold">FX</span>
+      </button>
+      <button id="boostBtn" class="bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold px-4 py-2.5 rounded-xl border border-cyan-200/50 shadow-lg shadow-cyan-500/30 transition transform active:scale-95 text-xs sm:text-sm flex items-center space-x-2">
+        <i class="fa-solid fa-bolt animate-pulse"></i>
+        <span>TURBO</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Bottom Status Guidance -->
+  <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none w-11/12 max-w-sm">
+    <div class="glass-panel px-4 py-2 rounded-full flex items-center justify-between w-full pointer-events-auto text-xs">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+        <span class="text-cyan-100 font-medium">TOCA CON LA CRESTA DE LA CABEZA</span>
+      </div>
+      <button id="recenterBtn" class="text-cyan-300 hover:text-white px-2 py-0.5 rounded bg-cyan-900/60 hover:bg-cyan-800 transition border border-cyan-400/40">
+        Centrar
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('flightCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const boostBtn = document.getElementById('boostBtn');
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const recenterBtn = document.getElementById('recenterBtn');
+    const targetWordDisplay = document.getElementById('targetWordDisplay');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const repeatVoiceBtn = document.getElementById('repeatVoiceBtn');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const ufoTimerBar = document.getElementById('ufoTimerBar');
+    const ufoTimerSeconds = document.getElementById('ufoTimerSeconds');
+    const victoryModal = document.getElementById('victoryModal');
+    const victoryTimeDisplay = document.getElementById('victoryTimeDisplay');
+    const restartBtn = document.getElementById('restartBtn');
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 3);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = width + 'px';
+      canvas.style.height = height + 'px';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Vocabulary pool: each word must appear exactly 2 times (32 total targets)
+    const WORDS = [
+      'UNFOLD', 'REPLAY', 'UNTIE', 'REHEAT', 
+      'UNFAIR', 'UNCLEAR', 'REJOIN', 'REWRITE', 
+      'UNHURT', 'RECHECK', 'UNLUCKY', 'UNWRAP', 
+      'REUSE', 'UNSURE', 'REREAD', 'UNSAFE'
+    ];
+
+    let targetDeck = [];
+    let currentTargetWord = '';
+    let currentScore = 0;
+    let wordSpawnTimer = 0;
+    let targetCatchTimer = 5.0; // 5-second countdown per target word
+    let missionStartTime = 0;
+    let gameFinished = false;
+
+    const fallingWords = [];
+    const explosionPieces = [];
+    const shockwaves = [];
+    const smokeParticles = [];
+    const hitPopups = [];
+
+    // Flying Saucer (UFO) system
+    const ufo = {
+      active: false,
+      x: -200,
+      y: 120,
+      targetY: 120,
+      speedX: 680,
+      width: 170,
+      height: 70,
+      angle: 0,
+      beamActive: false,
+      beamOpacity: 0
+    };
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function initMission() {
+      // 16 words * 2 = 32 total target words
+      targetDeck = shuffleArray([...WORDS, ...WORDS]);
+      currentScore = 0;
+      scoreDisplay.textContent = '0';
+      gameFinished = false;
+      missionStartTime = performance.now();
+      targetCatchTimer = 5.0;
+      fallingWords.length = 0;
+      ufo.active = false;
+      victoryModal.classList.add('hidden');
+      setNextTargetWord();
+    }
+
+    restartBtn.addEventListener('click', () => {
+      initMission();
+    });
+
+    // Speech synthesis for English pronunciation
+    function speakWord(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.95;
+      utterance.pitch = 1.05;
+
+      const voices = window.speechSynthesis.getVoices();
+      const enVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('US')));
+      if (enVoice) utterance.voice = enVoice;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function congratulateInEnglish(totalSeconds) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      let timeText = minutes > 0 ? `${minutes} minute${minutes > 1 ? 's' : ''} and ${seconds} seconds` : `${seconds} seconds`;
+      const speechText = `Footprints. Congratulations! Outstanding performance, pilot! You caught all thirty-two targets in ${timeText}!`;
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.92;
+      utterance.pitch = 0.82; // Deep, masculine vocal resonance
+
+      const voices = window.speechSynthesis.getVoices();
+      // Search specifically for native male voice presets across Windows, iOS/macOS, Android and Chrome
+      const maleVoice = voices.find(v => 
+        v.lang.startsWith('en') && 
+        (
+          v.name.toLowerCase().includes('male') ||
+          v.name.includes('David') ||
+          v.name.includes('Mark') ||
+          v.name.includes('George') ||
+          v.name.includes('Alex') ||
+          v.name.includes('Daniel') ||
+          v.name.includes('Guy') ||
+          v.name.includes('Google UK English Male')
+        )
+      ) || voices.find(v => v.lang.startsWith('en'));
+
+      if (maleVoice) utterance.voice = maleVoice;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {};
+    }
+
+    repeatVoiceBtn.addEventListener('click', () => {
+      if (currentTargetWord && !gameFinished) speakWord(currentTargetWord);
+    });
+
+    // Web Audio Synthesizer with Realistic Multi-Layer Explosion & UFO Sound
+    let audioCtx = null;
+    let jetGain = null;
+    let jetOsc = null;
+    let isSoundOn = false;
+
+    function initAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+
+        // Roaring jet noise
+        const bufferSize = audioCtx.sampleRate * 2;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const bandpass = audioCtx.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = 520;
+        bandpass.Q.value = 1.6;
+
+        jetGain = audioCtx.createGain();
+        jetGain.gain.value = 0.08;
+
+        whiteNoise.connect(bandpass);
+        bandpass.connect(jetGain);
+        jetGain.connect(audioCtx.destination);
+        whiteNoise.start(0);
+
+        // Low frequency hum
+        jetOsc = audioCtx.createOscillator();
+        jetOsc.type = 'sawtooth';
+        jetOsc.frequency.value = 75;
+
+        const oscFilter = audioCtx.createBiquadFilter();
+        oscFilter.type = 'lowpass';
+        oscFilter.frequency.value = 140;
+
+        const oscGain = audioCtx.createGain();
+        oscGain.gain.value = 0.04;
+
+        jetOsc.connect(oscFilter);
+        oscFilter.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+        jetOsc.start(0);
+
+        isSoundOn = true;
+      } catch (e) {
+        console.warn("Audio Context blocked:", e);
+      }
+    }
+
+    // Alien Flying Saucer Theremin Warble + Tractor Beam Noise
+    function playUfoAlarmSound() {
+      if (!audioCtx) initAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const now = audioCtx.currentTime;
+
+      // 1. Dual oscillating FM alien warble
+      const carrier = audioCtx.createOscillator();
+      const modulator = audioCtx.createOscillator();
+      const modGain = audioCtx.createGain();
+      const mainGain = audioCtx.createGain();
+
+      carrier.type = 'sine';
+      carrier.frequency.setValueAtTime(420, now);
+      carrier.frequency.linearRampToValueAtTime(780, now + 0.6);
+      carrier.frequency.linearRampToValueAtTime(340, now + 1.2);
+      carrier.frequency.linearRampToValueAtTime(820, now + 1.8);
+
+      modulator.type = 'sawtooth';
+      modulator.frequency.setValueAtTime(14, now); // 14 Hz vibrato flutter
+      modGain.gain.setValueAtTime(90, now);
+
+      modulator.connect(carrier.frequency);
+
+      mainGain.gain.setValueAtTime(0.01, now);
+      mainGain.gain.linearRampToValueAtTime(0.35, now + 0.3);
+      mainGain.gain.linearRampToValueAtTime(0.28, now + 1.5);
+      mainGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+      carrier.connect(mainGain);
+      mainGain.connect(audioCtx.destination);
+
+      modulator.start(now);
+      carrier.start(now);
+      modulator.stop(now + 2.2);
+      carrier.stop(now + 2.2);
+
+      // 2. Tractor Beam sweeping hum
+      const beamOsc = audioCtx.createOscillator();
+      const beamGain = audioCtx.createGain();
+      beamOsc.type = 'triangle';
+      beamOsc.frequency.setValueAtTime(120, now);
+      beamOsc.frequency.exponentialRampToValueAtTime(260, now + 0.8);
+      beamOsc.frequency.exponentialRampToValueAtTime(80, now + 2.0);
+
+      beamGain.gain.setValueAtTime(0.2, now);
+      beamGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+
+      beamOsc.connect(beamGain);
+      beamGain.connect(audioCtx.destination);
+      beamOsc.start(now);
+      beamOsc.stop(now + 2.0);
+    }
+
+    // Realistic multi-layered detonation sound
+    function playRealisticExplosionSound() {
+      if (!audioCtx) initAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const now = audioCtx.currentTime;
+
+      // 1. Sub-Bass Thump Drop (Impact Body)
+      const subOsc = audioCtx.createOscillator();
+      const subGain = audioCtx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(160, now);
+      subOsc.frequency.exponentialRampToValueAtTime(32, now + 0.38);
+      subGain.gain.setValueAtTime(0.7, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+      subOsc.connect(subGain);
+      subGain.connect(audioCtx.destination);
+      subOsc.start(now);
+      subOsc.stop(now + 0.65);
+
+      // 2. High-energy explosive noise body with distortion
+      const bufferSize = Math.floor(audioCtx.sampleRate * 0.9);
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - (i / bufferSize), 1.6);
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+
+      const blastFilter = audioCtx.createBiquadFilter();
+      blastFilter.type = 'lowpass';
+      blastFilter.frequency.setValueAtTime(950, now);
+      blastFilter.frequency.exponentialRampToValueAtTime(110, now + 0.8);
+
+      const noiseGain = audioCtx.createGain();
+      noiseGain.gain.setValueAtTime(0.65, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      noise.connect(blastFilter);
+      blastFilter.connect(noiseGain);
+      noiseGain.connect(audioCtx.destination);
+      noise.start(now);
+
+      // 3. Electric plasma shimmer/sparkle (Laser vapor tone)
+      const sparkleOsc = audioCtx.createOscillator();
+      const sparkleGain = audioCtx.createGain();
+      sparkleOsc.type = 'triangle';
+      sparkleOsc.frequency.setValueAtTime(650, now);
+      sparkleOsc.frequency.exponentialRampToValueAtTime(1200, now + 0.12);
+      sparkleOsc.frequency.exponentialRampToValueAtTime(180, now + 0.35);
+      sparkleGain.gain.setValueAtTime(0.25, now);
+      sparkleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      sparkleOsc.connect(sparkleGain);
+      sparkleGain.connect(audioCtx.destination);
+      sparkleOsc.start(now);
+      sparkleOsc.stop(now + 0.35);
+    }
+
+    function playDeflectSound() {
+      if (!audioCtx) initAudio();
+      if (!audioCtx || audioCtx.state !== 'running') return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.18);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    }
+
+    soundToggle.addEventListener('click', () => {
+      if (!audioCtx) {
+        initAudio();
+        soundIcon.className = "fa-solid fa-volume-high";
+      } else {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+          soundIcon.className = "fa-solid fa-volume-high";
+          isSoundOn = true;
+        } else if (audioCtx.state === 'running') {
+          audioCtx.suspend();
+          soundIcon.className = "fa-solid fa-volume-xmark";
+          isSoundOn = false;
+        }
+      }
+    });
+
+    const mecha = {
+      x: window.innerWidth / 2,
+      y: window.innerHeight * 0.55,
+      targetX: window.innerWidth / 2,
+      targetY: window.innerHeight * 0.55,
+      vx: 0,
+      vy: 0,
+      tilt: 0,
+      targetTilt: 0,
+      hoverOffset: 0,
+      hoverTimer: 0,
+      boosting: false,
+      altitude: 14850,
+      speed: 840,
+      screenShake: 0
+    };
+
+    function updateCursorTarget(x, y) {
+      const isMobile = width < 768;
+      const marginX = isMobile ? 32 : 65;
+      const marginY = isMobile ? 45 : 85;
+      mecha.targetX = Math.max(marginX, Math.min(width - marginX, x));
+      mecha.targetY = Math.max(marginY, Math.min(height - marginY, y));
+    }
+
+    window.addEventListener('mousemove', (e) => updateCursorTarget(e.clientX, e.clientY));
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) updateCursorTarget(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) updateCursorTarget(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    function setBoost(active) {
+      mecha.boosting = active;
+      if (active && !audioCtx) initAudio();
+      if (jetGain && audioCtx && audioCtx.state === 'running') {
+        jetGain.gain.setTargetAtTime(active ? 0.24 : 0.08, audioCtx.currentTime, 0.05);
+      }
+    }
+
+    boostBtn.addEventListener('mousedown', () => setBoost(true));
+    window.addEventListener('mouseup', () => setBoost(false));
+    boostBtn.addEventListener('touchstart', (e) => { e.preventDefault(); setBoost(true); });
+    window.addEventListener('touchend', () => setBoost(false));
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') setBoost(true); });
+    window.addEventListener('keyup', (e) => { if (e.code === 'Space') setBoost(false); });
+
+    recenterBtn.addEventListener('click', () => {
+      mecha.targetX = width / 2;
+      mecha.targetY = height * 0.55;
+    });
+
+    function setNextTargetWord() {
+      if (targetDeck.length === 0) {
+        // All 32 words captured!
+        finishGame();
+        return;
+      }
+
+      currentTargetWord = targetDeck.pop();
+      targetWordDisplay.textContent = currentTargetWord;
+      targetCatchTimer = 5.0; // Reset 5-second countdown timer
+
+      // Pronounce word in English
+      speakWord(currentTargetWord);
+
+      // Ensure the target word falls into view immediately
+      spawnWord(currentTargetWord);
+    }
+
+    function finishGame() {
+      gameFinished = true;
+      const totalElapsed = (performance.now() - missionStartTime) / 1000;
+      const m = Math.floor(totalElapsed / 60);
+      const s = Math.floor(totalElapsed % 60);
+      const ms = Math.floor((totalElapsed % 1) * 10);
+      const formattedTime = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`;
+
+      victoryTimeDisplay.textContent = formattedTime;
+      victoryModal.classList.remove('hidden');
+
+      // Voice congratulations in English with exact elapsed time
+      congratulateInEnglish(totalElapsed);
+    }
+
+    // Triggers the Alien Flying Saucer event when the 5-second timer expires
+    function triggerUfoEvent() {
+      if (ufo.active) return;
+      ufo.active = true;
+      ufo.x = -180;
+      ufo.y = Math.min(height * 0.28, 160);
+      ufo.beamActive = true;
+      ufo.beamOpacity = 0.85;
+
+      // Play sci-fi UFO noise
+      playUfoAlarmSound();
+      addHitPopup(width / 2, 180, '⚠️ UFO INVASION! WORDS VAPORIZED!', '#f43f5e');
+
+      // Vaporize all falling words with particle sparkles
+      fallingWords.forEach(w => {
+        triggerTargetWordDetonation(w.x + w.width / 2, w.y + w.height / 2, w.text);
+      });
+      fallingWords.length = 0;
+
+      // Reset timer & spawn new batch for current target word
+      targetCatchTimer = 5.0;
+      setTimeout(() => {
+        if (!gameFinished) {
+          speakWord(currentTargetWord);
+          spawnWord(currentTargetWord);
+        }
+      }, 1200);
+    }
+
+    // Render Alien Flying Saucer with glowing tractor beam
+    function updateAndDrawUfo(dt) {
+      if (!ufo.active) return;
+
+      ufo.x += ufo.speedX * dt;
+      ufo.angle = Math.sin(Date.now() * 0.008) * 0.15;
+
+      const saucerX = ufo.x;
+      const saucerY = ufo.y + Math.sin(Date.now() * 0.012) * 10;
+
+      ctx.save();
+      ctx.translate(saucerX, saucerY);
+      ctx.rotate(ufo.angle);
+
+      // 1. Tractor Beam sweeping downwards
+      const beamGrad = ctx.createLinearGradient(0, 15, 0, height);
+      beamGrad.addColorStop(0, 'rgba(0, 255, 180, 0.45)');
+      beamGrad.addColorStop(0.4, 'rgba(0, 240, 255, 0.25)');
+      beamGrad.addColorStop(1, 'rgba(120, 0, 255, 0)');
+
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(-35, 12);
+      ctx.lineTo(-width * 0.25, height);
+      ctx.lineTo(width * 0.25, height);
+      ctx.lineTo(35, 12);
+      ctx.closePath();
+      ctx.fill();
+
+      // Tractor beam scan rings
+      const ringY = (Date.now() * 0.3) % 250;
+      ctx.strokeStyle = 'rgba(0, 255, 200, 0.5)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 30 + ringY, 30 + ringY * 0.7, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 2. Flying Saucer Outer Disc
+      ctx.shadowColor = '#00ffc4';
+      ctx.shadowBlur = 24;
+
+      const saucerGrad = ctx.createLinearGradient(-80, -25, 80, 25);
+      saucerGrad.addColorStop(0, '#64748b');
+      saucerGrad.addColorStop(0.5, '#e2e8f0');
+      saucerGrad.addColorStop(1, '#334155');
+
+      ctx.fillStyle = saucerGrad;
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(0, 5, 85, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Lower saucer rim with pulsating alien lights
+      const lightCount = 8;
+      for (let i = 0; i < lightCount; i++) {
+        const theta = (i / lightCount) * Math.PI * 2 + (Date.now() * 0.005);
+        const lx = Math.cos(theta) * 72;
+        const ly = 5 + Math.sin(theta) * 16;
+        ctx.fillStyle = (i % 2 === 0) ? '#00ffc4' : '#f43f5e';
+        ctx.beginPath();
+        ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. Glowing Plasma Cockpit Dome
+      const domeGrad = ctx.createRadialGradient(0, -18, 4, 0, -14, 40);
+      domeGrad.addColorStop(0, '#ffffff');
+      domeGrad.addColorStop(0.3, '#38bdf8');
+      domeGrad.addColorStop(0.85, '#0284c7');
+      domeGrad.addColorStop(1, '#0369a1');
+
+      ctx.fillStyle = domeGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, -12, 38, 26, 0, Math.PI, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Alien cockpit silhouette / glowing eye
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      ctx.ellipse(0, -12, 14, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#00ffc4';
+      ctx.shadowColor = '#00ffc4';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(-4, -14, 3, 0, Math.PI * 2);
+      ctx.arc(4, -14, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Deactivate when it flies out of the screen
+      if (ufo.x > width + 220) {
+        ufo.active = false;
+      }
+    }
+
+    class FallingWord {
+      constructor(text, forceX) {
+        this.text = text;
+        this.width = Math.max(120, text.length * 15 + 32);
+        this.height = 42;
+        this.x = forceX !== undefined ? forceX : Math.random() * (width - this.width - 60) + 30;
+        this.y = -60 - Math.random() * 40;
+        this.speedY = 1.4 + Math.random() * 0.9;
+        this.active = true;
+        this.pulse = Math.random() * Math.PI * 2;
+      }
+      update(speedMul) {
+        this.y += this.speedY * speedMul * 1.5;
+        this.pulse += 0.05;
+        if (this.y > height + 50) {
+          this.active = false;
+        }
+      }
+      draw(c) {
+        c.save();
+        const isTarget = this.text === currentTargetWord;
+        
+        c.shadowColor = isTarget ? '#00f6ff' : '#38bdf8';
+        c.shadowBlur = 14;
+
+        const grad = c.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+        grad.addColorStop(0, isTarget ? 'rgba(12, 42, 94, 0.94)' : 'rgba(10, 28, 64, 0.88)');
+        grad.addColorStop(1, isTarget ? 'rgba(4, 18, 50, 0.98)' : 'rgba(3, 13, 34, 0.94)');
+
+        c.fillStyle = grad;
+        c.strokeStyle = isTarget ? '#00f6ff' : 'rgba(100, 200, 255, 0.5)';
+        c.lineWidth = isTarget ? 2.8 : 1.5;
+
+        c.beginPath();
+        c.roundRect(this.x, this.y, this.width, this.height, 14);
+        c.fill();
+        c.stroke();
+
+        if (isTarget) {
+          c.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+          c.strokeRect(this.x + 3, this.y + 3, this.width - 6, this.height - 6);
+        }
+
+        c.font = '700 17px "Orbitron", monospace';
+        c.fillStyle = '#ffffff';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.shadowColor = isTarget ? '#00f6ff' : '#38bdf8';
+        c.shadowBlur = 10;
+        c.fillText(this.text, this.x + this.width / 2, this.y + this.height / 2 + 1);
+
+        c.restore();
+      }
+    }
+
+    function spawnWord(forceText) {
+      const text = forceText || WORDS[Math.floor(Math.random() * WORDS.length)];
+      const fw = new FallingWord(text);
+      fallingWords.push(fw);
+    }
+
+    function addHitPopup(x, y, text, color = '#10b981') {
+      hitPopups.push({
+        x, y, text, color,
+        life: 45,
+        maxLife: 45
+      });
+    }
+
+    // Realistic Multi-Phase Explosion System
+    class Shockwave {
+      constructor(x, y, color = '#00f6ff') {
+        this.x = x;
+        this.y = y;
+        this.radius = 12;
+        this.maxRadius = 140 + Math.random() * 40;
+        this.color = color;
+        this.life = 1.0;
+        this.decay = 0.038;
+      }
+      update() {
+        this.radius += (this.maxRadius - this.radius) * 0.18 + 2.5;
+        this.life -= this.decay;
+      }
+      draw(c) {
+        if (this.life <= 0) return;
+        c.save();
+        c.globalAlpha = Math.max(0, this.life);
+        c.strokeStyle = this.color;
+        c.shadowColor = this.color;
+        c.shadowBlur = 20;
+        c.lineWidth = 5 * this.life;
+        c.beginPath();
+        c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        c.stroke();
+        c.restore();
+      }
+    }
+
+    class SmokeParticle {
+      constructor(x, y) {
+        this.x = x + (Math.random() - 0.5) * 20;
+        this.y = y + (Math.random() - 0.5) * 20;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.2 + Math.random() * 3.5;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.size = 14 + Math.random() * 18;
+        this.life = 1.0;
+        this.decay = 0.018 + Math.random() * 0.015;
+        this.color = Math.random() > 0.4 ? 'rgba(200, 240, 255,' : 'rgba(70, 140, 220,';
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vx *= 0.95;
+        this.vy *= 0.95;
+        this.size += 0.85;
+        this.life -= this.decay;
+      }
+      draw(c) {
+        if (this.life <= 0) return;
+        c.save();
+        c.globalAlpha = Math.max(0, this.life * 0.55);
+        c.fillStyle = `${this.color}${this.life})`;
+        c.beginPath();
+        c.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    }
+
+    class ExplosionShard {
+      constructor(x, y, textShard) {
+        this.x = x;
+        this.y = y;
+        this.textShard = textShard;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4 + Math.random() * 14;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.size = 6 + Math.random() * 12;
+        this.rot = Math.random() * Math.PI * 2;
+        this.rotSpeed = (Math.random() - 0.5) * 0.35;
+        this.life = 1.0;
+        this.decay = 0.018 + Math.random() * 0.02;
+        const colors = ['#ffffff', '#00f6ff', '#38bdf8', '#0284c7', '#f59e0b', '#fbbf24'];
+        this.color = colors[Math.floor(Math.random() * colors.length)];
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.22; // gravity pull
+        this.vx *= 0.97;
+        this.rot += this.rotSpeed;
+        this.life -= this.decay;
+      }
+      draw(c) {
+        if (this.life <= 0) return;
+        c.save();
+        c.globalAlpha = Math.max(0, this.life);
+        c.translate(this.x, this.y);
+        c.rotate(this.rot);
+        c.fillStyle = this.color;
+        c.shadowColor = this.color;
+        c.shadowBlur = 15;
+
+        if (this.textShard && this.life > 0.4) {
+          c.font = '900 13px "Orbitron", monospace';
+          c.fillText(this.textShard, 0, 0);
+        } else {
+          c.fillRect(-this.size / 2, -this.size / 2, this.size, this.size * 0.65);
+        }
+        c.restore();
+      }
+    }
+
+    // Detonates the word capsule in an explosive flash and keeps flight uninterrupted!
+    function triggerTargetWordDetonation(x, y, wordText) {
+      mecha.screenShake = 22;
+      playRealisticExplosionSound();
+
+      // Shockwave rings (double pulse)
+      shockwaves.push(new Shockwave(x, y, '#ffffff'));
+      setTimeout(() => shockwaves.push(new Shockwave(x, y, '#00f6ff')), 40);
+
+      // Shrapnel shards containing fragmented letters of the word
+      const letters = wordText.split('');
+      for (let i = 0; i < 48; i++) {
+        const letter = i < letters.length ? letters[i] : null;
+        explosionPieces.push(new ExplosionShard(x, y, letter));
+      }
+
+      // Volumetric smoke puffs
+      for (let i = 0; i < 22; i++) {
+        smokeParticles.push(new SmokeParticle(x, y));
+      }
+    }
+
+    const clouds = [];
+    const windStreaks = [];
+
+    function initAtmosphere() {
+      clouds.length = 0;
+      windStreaks.length = 0;
+      for (let i = 0; i < 24; i++) {
+        clouds.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          rx: 120 + Math.random() * 220,
+          ry: 45 + Math.random() * 90,
+          speed: 1.2 + Math.random() * 2.8,
+          alpha: 0.08 + Math.random() * 0.16
+        });
+      }
+      for (let i = 0; i < 40; i++) {
+        windStreaks.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          length: 60 + Math.random() * 140,
+          speed: 8 + Math.random() * 15,
+          alpha: 0.15 + Math.random() * 0.35,
+          width: 1 + Math.random() * 2.2
+        });
+      }
+    }
+    initAtmosphere();
+    window.addEventListener('resize', initAtmosphere);
+
+    function drawAtmosphere(speedMul) {
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+      skyGrad.addColorStop(0, '#020b1e');
+      skyGrad.addColorStop(0.35, '#041738');
+      skyGrad.addColorStop(0.75, '#072b64');
+      skyGrad.addColorStop(1, '#0e448b');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      const sunGrad = ctx.createRadialGradient(width * 0.5, -height * 0.1, 80, width * 0.5, -height * 0.1, height * 0.85);
+      sunGrad.addColorStop(0, 'rgba(0, 240, 255, 0.28)');
+      sunGrad.addColorStop(0.4, 'rgba(20, 140, 255, 0.14)');
+      sunGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sunGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      clouds.forEach(c => {
+        c.y += c.speed * speedMul;
+        if (c.y - c.ry > height) {
+          c.y = -c.ry - 50;
+          c.x = Math.random() * width;
+        }
+
+        const cloudGrad = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, c.rx);
+        cloudGrad.addColorStop(0, `rgba(180, 230, 255, ${c.alpha * 1.5})`);
+        cloudGrad.addColorStop(0.5, `rgba(100, 190, 255, ${c.alpha * 0.8})`);
+        cloudGrad.addColorStop(1, 'rgba(10, 40, 90, 0)');
+
+        ctx.fillStyle = cloudGrad;
+        ctx.beginPath();
+        ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      windStreaks.forEach(w => {
+        w.y += w.speed * speedMul;
+        if (w.y > height + w.length) {
+          w.y = -w.length;
+          w.x = Math.random() * width;
+        }
+
+        ctx.strokeStyle = `rgba(180, 240, 255, ${w.alpha * (mecha.boosting ? 1.5 : 1)})`;
+        ctx.lineWidth = w.width;
+        ctx.beginPath();
+        ctx.moveTo(w.x, w.y);
+        ctx.lineTo(w.x - (mecha.tilt * 15), w.y + w.length * (mecha.boosting ? 1.8 : 1));
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    const particles = [];
+    class JetParticle {
+      constructor(x, y, vx, vy, color, size, life) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.size = size;
+        this.maxLife = life;
+        this.life = life;
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.size *= 0.94;
+        this.life--;
+      }
+      draw(c) {
+        const alpha = Math.max(0, this.life / this.maxLife);
+        c.save();
+        c.globalAlpha = alpha;
+        c.fillStyle = this.color;
+        c.shadowColor = this.color;
+        c.shadowBlur = 14;
+        c.beginPath();
+        c.arc(this.x, this.y, Math.max(0.5, this.size), 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    }
+
+    function spawnJetParticles(x, y, count, boost) {
+      for (let i = 0; i < count; i++) {
+        const spread = (Math.random() - 0.5) * 16;
+        const speedY = (boost ? 12 : 7) + Math.random() * 8;
+        const speedX = spread * 0.35;
+        const color = Math.random() > 0.4 ? '#00f6ff' : (Math.random() > 0.5 ? '#ffffff' : '#00a6ff');
+        const size = (boost ? 8 : 5) + Math.random() * 4;
+        const life = 18 + Math.random() * 16;
+        particles.push(new JetParticle(x + spread, y, speedX, speedY, color, size, life));
+      }
+    }
+
+    function drawElectricLightning(ctx, x1, y1, x2, y2, segments, jitter) {
+      ctx.save();
+      ctx.strokeStyle = '#67e8f9';
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+
+      for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const nextX = x1 + (x2 - x1) * t + (Math.random() - 0.5) * jitter;
+        const nextY = y1 + (y2 - y1) * t + (Math.random() - 0.5) * jitter;
+        ctx.lineTo(nextX, nextY);
+      }
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawFaithfulMecha(x, y, tilt, boost) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(tilt);
+
+      const isMobile = width < 768;
+      const baseHeight = Math.min(height * 0.78, 640);
+      const s = (baseHeight / 720) * (isMobile ? 0.35 : 0.70);
+      ctx.scale(s, s);
+
+      const C_BASE_BLUE = '#2b75e2';
+      const C_LIGHT_BLUE = '#529cfb';
+      const C_SPECULAR = '#96c8ff';
+      const C_DEEP_BLUE = '#154ca7';
+      const C_VERY_DARK = '#0a2356';
+      const C_CARBON = '#162235';
+      const C_TITANIUM = '#273852';
+      const C_CYAN = '#00f6ff';
+      const C_OUTLINE = '#061329';
+
+      ctx.lineWidth = 3.4;
+      ctx.strokeStyle = C_OUTLINE;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // 1. Dual Rear Thrusters
+      const thrusterLeftX = -56;
+      const thrusterRightX = 56;
+      const nozzleY = 74;
+
+      function renderIonPlume(tx, ty) {
+        const flameLen = boost ? 140 + Math.random() * 30 : 80 + Math.sin(Date.now() * 0.035) * 16;
+        const flameW = boost ? 34 : 24;
+
+        ctx.save();
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = boost ? 35 : 20;
+
+        const grad = ctx.createLinearGradient(tx, ty, tx, ty + flameLen);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.18, C_CYAN);
+        grad.addColorStop(0.65, 'rgba(0, 150, 255, 0.65)');
+        grad.addColorStop(1, 'rgba(0, 60, 200, 0)');
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(tx - flameW / 2, ty);
+        ctx.quadraticCurveTo(tx - flameW * 0.85, ty + flameLen * 0.45, tx, ty + flameLen);
+        ctx.quadraticCurveTo(tx + flameW * 0.85, ty + flameLen * 0.45, tx + flameW / 2, ty);
+        ctx.closePath();
+        ctx.fill();
+
+        const coreLen = flameLen * 0.58;
+        const coreW = flameW * 0.5;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(tx - coreW / 2, ty);
+        ctx.quadraticCurveTo(tx - coreW * 0.6, ty + coreLen * 0.5, tx, ty + coreLen);
+        ctx.quadraticCurveTo(tx + coreW * 0.6, ty + coreLen * 0.5, tx + coreW / 2, ty);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        spawnJetParticles(x + (tx * s), y + (ty * s), boost ? 3 : 1, boost);
+      }
+
+      renderIonPlume(thrusterLeftX, nozzleY);
+      renderIonPlume(thrusterRightX, nozzleY);
+
+      // 2. Backpack Pods & Shoulder Antenna Spears
+      [-65, 65].forEach(side => {
+        const tankGrad = ctx.createLinearGradient(side - 16, 0, side + 16, 0);
+        tankGrad.addColorStop(0, side < 0 ? C_LIGHT_BLUE : C_DEEP_BLUE);
+        tankGrad.addColorStop(0.5, C_BASE_BLUE);
+        tankGrad.addColorStop(1, side < 0 ? C_DEEP_BLUE : C_LIGHT_BLUE);
+
+        ctx.fillStyle = tankGrad;
+        ctx.fillRect(side - 16, -112, 32, 160);
+        ctx.strokeRect(side - 16, -112, 32, 160);
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 10;
+        for (let k = 0; k < 4; k++) {
+          ctx.fillRect(side - 7, -90 + k * 28, 14, 12);
+        }
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = C_BASE_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(side * 0.9, -60);
+        ctx.lineTo(side * 1.55, -125);
+        ctx.lineTo(side * 1.45, -130);
+        ctx.lineTo(side * 0.8, -64);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.beginPath();
+        ctx.arc(side * 1.5, -127, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = C_CARBON;
+        ctx.beginPath();
+        ctx.rect(side - 18, 52, 36, 18);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#0a1424';
+        ctx.beginPath();
+        ctx.rect(side - 14, 70, 28, 9);
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // Flexible conduit cables
+      ctx.strokeStyle = C_CARBON;
+      ctx.lineWidth = 11;
+      ctx.beginPath();
+      ctx.moveTo(-68, -25);
+      ctx.bezierCurveTo(-118, -10, -118, 70, -82, 80);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(68, -25);
+      ctx.bezierCurveTo(118, -10, 118, 70, 82, 80);
+      ctx.stroke();
+      ctx.lineWidth = 3.4;
+
+      // 3. Articulated Legs & Propulsion Sabatons
+      function drawLeg(dir) {
+        ctx.save();
+        ctx.scale(dir, 1);
+
+        const thighGrad = ctx.createLinearGradient(15, 100, 55, 100);
+        thighGrad.addColorStop(0, dir > 0 ? C_LIGHT_BLUE : C_DEEP_BLUE);
+        thighGrad.addColorStop(0.5, C_BASE_BLUE);
+        thighGrad.addColorStop(1, dir > 0 ? C_DEEP_BLUE : C_LIGHT_BLUE);
+
+        ctx.fillStyle = thighGrad;
+        ctx.beginPath();
+        ctx.moveTo(14, 98);
+        ctx.lineTo(56, 108);
+        ctx.lineTo(44, 210);
+        ctx.lineTo(16, 200);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(22, 115);
+        ctx.lineTo(46, 122);
+        ctx.lineTo(38, 196);
+        ctx.lineTo(24, 190);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = C_CARBON;
+        ctx.beginPath();
+        ctx.arc(32, 215, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_TITANIUM;
+        ctx.beginPath();
+        ctx.arc(32, 215, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Knee Hex Armor Cap
+        ctx.fillStyle = C_BASE_BLUE;
+        ctx.beginPath();
+        const kx = 32, ky = 215, kr = 18;
+        for (let i = 0; i < 6; i++) {
+          const ang = (i * Math.PI) / 3;
+          const px = kx + Math.cos(ang) * kr;
+          const py = ky + Math.sin(ang) * kr;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const ang = (i * Math.PI) / 3;
+          const px = kx + Math.cos(ang) * (kr * 0.55);
+          const py = ky + Math.sin(ang) * (kr * 0.55);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Shin Armor
+        ctx.fillStyle = thighGrad;
+        ctx.beginPath();
+        ctx.moveTo(18, 230);
+        ctx.lineTo(50, 230);
+        ctx.lineTo(52, 320);
+        ctx.lineTo(14, 320);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(23, 245);
+        ctx.lineTo(44, 245);
+        ctx.lineTo(46, 305);
+        ctx.lineTo(22, 305);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 7;
+        ctx.fillRect(25, 260, 18, 4.5);
+        ctx.fillRect(25, 278, 18, 4.5);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = C_CARBON;
+        ctx.beginPath();
+        ctx.arc(34, 328, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_BASE_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(-22, 328);
+        ctx.lineTo(18, 328);
+        ctx.lineTo(36, 350);
+        ctx.lineTo(44, 372);
+        ctx.lineTo(-24, 372);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_VERY_DARK;
+        ctx.fillRect(-26, 370, 74, 9);
+        ctx.strokeRect(-26, 370, 74, 9);
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 7;
+        ctx.fillRect(12, 354, 18, 5);
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+      }
+
+      drawLeg(-1);
+      drawLeg(1);
+
+      // 4. Pelvis & Abdomen
+      ctx.fillStyle = C_CARBON;
+      ctx.beginPath();
+      ctx.rect(-34, 68, 68, 38);
+      ctx.fill();
+      ctx.stroke();
+
+      for (let sp = 0; sp < 3; sp++) {
+        ctx.fillStyle = C_DEEP_BLUE;
+        ctx.beginPath();
+        ctx.ellipse(0, 36 + sp * 16, 26 - sp * 2, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = C_BASE_BLUE;
+      ctx.beginPath();
+      ctx.moveTo(-28, 76);
+      ctx.lineTo(28, 76);
+      ctx.lineTo(18, 120);
+      ctx.lineTo(0, 132);
+      ctx.lineTo(-18, 120);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = C_LIGHT_BLUE;
+      ctx.beginPath();
+      ctx.moveTo(-14, 82);
+      ctx.lineTo(14, 82);
+      ctx.lineTo(0, 114);
+      ctx.closePath();
+      ctx.fill();
+
+      // 5. Chest & Central Arc Reactor
+      const chestGrad = ctx.createLinearGradient(-68, -48, 68, 36);
+      chestGrad.addColorStop(0, C_LIGHT_BLUE);
+      chestGrad.addColorStop(0.5, C_BASE_BLUE);
+      chestGrad.addColorStop(1, C_DEEP_BLUE);
+
+      ctx.fillStyle = chestGrad;
+      ctx.beginPath();
+      ctx.moveTo(-68, -48);
+      ctx.lineTo(68, -48);
+      ctx.lineTo(55, 34);
+      ctx.lineTo(-55, 34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      [-1, 1].forEach(side => {
+        ctx.save();
+        ctx.scale(side, 1);
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(6, -42);
+        ctx.lineTo(58, -42);
+        ctx.lineTo(46, -4);
+        ctx.lineTo(6, -4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(24, -34, 18, 3.5);
+        ctx.fillRect(24, -23, 18, 3.5);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      });
+
+      // Upper Sternum Hexagon
+      ctx.fillStyle = C_DEEP_BLUE;
+      ctx.beginPath();
+      const hx = 0, hy = -24, hr = 16;
+      for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        const px = hx + Math.cos(ang) * hr;
+        const py = hy + Math.sin(ang) * hr;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = C_CYAN;
+      ctx.shadowColor = C_CYAN;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const ang = (i * Math.PI) / 3;
+        const px = hx + Math.cos(ang) * (hr * 0.58);
+        const py = hy + Math.sin(ang) * (hr * 0.58);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Central Plasma Arc Reactor
+      const coreY = 16;
+      const coreRadius = 24;
+
+      ctx.fillStyle = C_CARBON;
+      ctx.beginPath();
+      ctx.arc(0, coreY, coreRadius + 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      const pulse = Math.sin(Date.now() * 0.008) * 3;
+      ctx.save();
+      ctx.shadowColor = C_CYAN;
+      ctx.shadowBlur = boost ? 34 : 20;
+
+      const coreGrad = ctx.createRadialGradient(0, coreY, 2, 0, coreY, coreRadius);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.35, C_CYAN);
+      coreGrad.addColorStop(0.8, '#0084ff');
+      coreGrad.addColorStop(1, '#003ba8');
+
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, coreY, coreRadius + (boost ? 2 : 0), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, coreY, 9 + (pulse * 0.4), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      // 6. Arms & Hands
+      function drawArm(dir) {
+        ctx.save();
+        ctx.scale(dir, 1);
+
+        const pauldronGrad = ctx.createRadialGradient(75, -50, 10, 80, -42, 34);
+        pauldronGrad.addColorStop(0, C_SPECULAR);
+        pauldronGrad.addColorStop(0.4, C_LIGHT_BLUE);
+        pauldronGrad.addColorStop(1, C_DEEP_BLUE);
+
+        ctx.fillStyle = pauldronGrad;
+        ctx.beginPath();
+        ctx.arc(80, -42, 32, Math.PI * 0.9, Math.PI * 2.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(80, -56, 16, 4);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = C_DEEP_BLUE;
+        ctx.fillRect(72, -18, 26, 42);
+        ctx.strokeRect(72, -18, 26, 42);
+
+        ctx.fillStyle = C_CARBON;
+        ctx.beginPath();
+        ctx.arc(85, 30, 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.beginPath();
+        ctx.arc(85, 30, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = C_BASE_BLUE;
+        ctx.beginPath();
+        ctx.moveTo(68, 44);
+        ctx.lineTo(104, 44);
+        ctx.lineTo(110, 120);
+        ctx.lineTo(65, 120);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.fillRect(75, 54, 25, 48);
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(78, 62, 7, 10);
+        ctx.fillRect(88, 62, 7, 10);
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = C_CARBON;
+        ctx.fillRect(106, 68, 8, 38);
+        ctx.strokeRect(106, 68, 8, 38);
+
+        ctx.fillStyle = C_TITANIUM;
+        ctx.fillRect(74, 120, 28, 12);
+        ctx.strokeRect(74, 120, 28, 12);
+
+        ctx.fillStyle = C_BASE_BLUE;
+        ctx.beginPath();
+        ctx.ellipse(88, 140, 15, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(88, 140, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        for (let f = 0; f < 4; f++) {
+          const fx = 75 + f * 9;
+          const fy = 150;
+          ctx.fillStyle = C_CARBON;
+          ctx.beginPath();
+          ctx.roundRect(fx - 4, fy, 8, 22 + (f === 1 || f === 2 ? 5 : 0), 3);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = C_LIGHT_BLUE;
+          ctx.fillRect(fx - 2.5, fy + 4, 5, 5);
+        }
+
+        ctx.fillStyle = C_CARBON;
+        ctx.beginPath();
+        ctx.roundRect(66, 136, 8, 18, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      drawArm(-1);
+      drawArm(1);
+
+      // 7. Helmet, Visor & Top Crest Horn (Collision Apex Point)
+      ctx.fillStyle = C_CARBON;
+      ctx.fillRect(-26, -60, 52, 18);
+      ctx.strokeRect(-26, -60, 52, 18);
+
+      ctx.fillStyle = C_BASE_BLUE;
+      ctx.beginPath();
+      ctx.moveTo(-22, -62);
+      ctx.lineTo(22, -62);
+      ctx.lineTo(16, -44);
+      ctx.lineTo(-16, -44);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#06132b';
+      ctx.beginPath();
+      ctx.roundRect(-12, -56, 24, 7, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = C_CYAN;
+      ctx.shadowColor = C_CYAN;
+      ctx.shadowBlur = 8;
+      ctx.fillRect(-8, -54, 16, 3);
+      ctx.shadowBlur = 0;
+
+      const helmetGrad = ctx.createRadialGradient(0, -115, 15, 0, -100, 55);
+      helmetGrad.addColorStop(0, C_SPECULAR);
+      helmetGrad.addColorStop(0.45, C_LIGHT_BLUE);
+      helmetGrad.addColorStop(0.85, C_BASE_BLUE);
+      helmetGrad.addColorStop(1, C_DEEP_BLUE);
+
+      ctx.fillStyle = helmetGrad;
+      ctx.beginPath();
+      ctx.arc(0, -100, 54, Math.PI * 0.8, Math.PI * 2.2);
+      ctx.lineTo(44, -58);
+      ctx.lineTo(-44, -58);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // APEX CYAN HORN / CREST (The exact head hitting point!)
+      ctx.fillStyle = C_CYAN;
+      ctx.shadowColor = C_CYAN;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.moveTo(-8, -145);
+      ctx.lineTo(0, -188);
+      ctx.lineTo(8, -145);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      [-1, 1].forEach(side => {
+        ctx.fillStyle = C_LIGHT_BLUE;
+        ctx.beginPath();
+        ctx.ellipse(side * 48, -100, 10, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = C_CYAN;
+        ctx.shadowColor = C_CYAN;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(side * 48 - 3, -108, 6, 16);
+        ctx.shadowBlur = 0;
+      });
+
+      ctx.fillStyle = C_VERY_DARK;
+      ctx.beginPath();
+      ctx.roundRect(-42, -128, 84, 64, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      const visorGrad = ctx.createLinearGradient(0, -128, 0, -64);
+      visorGrad.addColorStop(0, '#030b1c');
+      visorGrad.addColorStop(0.7, '#071d44');
+      visorGrad.addColorStop(1, '#020814');
+
+      ctx.fillStyle = visorGrad;
+      ctx.beginPath();
+      ctx.roundRect(-37, -123, 74, 54, 12);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+      for (let sl = -120; sl < -70; sl += 4) {
+        ctx.fillRect(-35, sl, 70, 1.5);
+      }
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+      ctx.beginPath();
+      ctx.moveTo(-32, -120);
+      ctx.lineTo(25, -120);
+      ctx.lineTo(-15, -75);
+      ctx.lineTo(-32, -75);
+      ctx.closePath();
+      ctx.fill();
+
+      // Glowing Cyan Round Eyes
+      const eyeGlow = boost ? 28 : 16;
+      ctx.save();
+      ctx.shadowColor = C_CYAN;
+      ctx.shadowBlur = eyeGlow;
+
+      [-18, 18].forEach(eyeX => {
+        ctx.fillStyle = C_CYAN;
+        ctx.beginPath();
+        ctx.arc(eyeX, -98, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(eyeX, -98, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 140, 255, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(eyeX, -98, 8.5, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+      ctx.restore();
+
+      // Dynamic Electric Lightning Sparks
+      if (Math.random() > 0.12) {
+        drawElectricLightning(ctx, -42, -56, -20, -48, 5, 8);
+      }
+      if (Math.random() > 0.12) {
+        drawElectricLightning(ctx, 42, -56, 20, -48, 5, 8);
+      }
+      if (boost && Math.random() > 0.25) {
+        drawElectricLightning(ctx, -75, -45, -50, 20, 6, 12);
+        drawElectricLightning(ctx, 75, -45, 50, 20, 6, 12);
+      }
+
+      ctx.restore();
+    }
+
+    let lastTime = performance.now();
+
+    function flightLoop(timestamp) {
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      // Ultra-crisp High-DPI / Retina vector rendering
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Aerodynamic hover oscillation
+      mecha.hoverTimer += dt * 2.8;
+      mecha.hoverOffset = Math.sin(mecha.hoverTimer) * 10;
+
+      // Update Mission Stop Watch
+      if (!gameFinished && missionStartTime > 0) {
+        const elapsed = (performance.now() - missionStartTime) / 1000;
+        const mm = Math.floor(elapsed / 60);
+        const ss = Math.floor(elapsed % 60);
+        timerDisplay.textContent = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+
+        // 5-Second Inactivity Countdown for Current Target Word
+        targetCatchTimer -= dt;
+        if (targetCatchTimer <= 0) {
+          triggerUfoEvent();
+        } else {
+          const ratio = Math.max(0, targetCatchTimer / 5.0);
+          ufoTimerBar.style.width = `${(ratio * 100).toFixed(1)}%`;
+          ufoTimerSeconds.textContent = `${Math.max(0, targetCatchTimer).toFixed(1)}s`;
+        }
+      }
+
+      // Inertia & mouse tracking
+      const dx = mecha.targetX - mecha.x;
+      const dy = (mecha.targetY + mecha.hoverOffset) - mecha.y;
+      const followTension = mecha.boosting ? 6.5 : 4.8;
+      mecha.vx += (dx * followTension - mecha.vx) * 0.1;
+      mecha.vy += (dy * followTension - mecha.vy) * 0.1;
+
+      mecha.x += mecha.vx * dt;
+      mecha.y += mecha.vy * dt;
+
+      // Dynamic tilt / banking
+      mecha.targetTilt = Math.max(-0.24, Math.min(0.24, (mecha.vx / 300) * 0.22));
+      mecha.tilt += (mecha.targetTilt - mecha.tilt) * 0.12;
+
+      // Render atmosphere
+      drawAtmosphere(mecha.boosting ? 3.6 : 1.4);
+
+      // Render jet particles behind mecha
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.update();
+        p.draw(ctx);
+        if (p.life <= 0 || p.size <= 0.2) particles.splice(i, 1);
+      }
+
+      // Draw and animate UFO if active
+      updateAndDrawUfo(dt);
+
+      // Word Spawning frequency
+      wordSpawnTimer += dt;
+      if (wordSpawnTimer > (mecha.boosting ? 1.2 : 1.6) && !gameFinished) {
+        wordSpawnTimer = 0;
+        spawnWord();
+      }
+
+      // Screen Shake
+      ctx.save();
+      const totalShake = (mecha.boosting ? 3 : 0) + mecha.screenShake;
+      if (totalShake > 0) {
+        const sx = (Math.random() - 0.5) * totalShake;
+        const sy = (Math.random() - 0.5) * totalShake;
+        ctx.translate(sx, sy);
+        mecha.screenShake *= 0.90;
+        if (mecha.screenShake < 0.1) mecha.screenShake = 0;
+      }
+
+      // Update & Draw Falling Words
+      const speedMultiplier = mecha.boosting ? 2.2 : 1.2;
+      fallingWords.forEach(w => {
+        w.update(speedMultiplier);
+        w.draw(ctx);
+      });
+
+      for (let i = fallingWords.length - 1; i >= 0; i--) {
+        if (!fallingWords[i].active) fallingWords.splice(i, 1);
+      }
+
+      // Head Coordinates Calculation for precise hit detection:
+      const isMobile = width < 768;
+      const baseHeight = Math.min(height * 0.78, 640);
+      const s = (baseHeight / 720) * (isMobile ? 0.35 : 0.70);
+      const headOffsetY = -160 * s;
+      const headRadius = 46 * s;
+
+      const headWorldX = mecha.x + Math.sin(mecha.tilt) * headOffsetY;
+      const headWorldY = mecha.y + Math.cos(mecha.tilt) * headOffsetY;
+
+      // Draw Mecha
+      drawFaithfulMecha(mecha.x, mecha.y, mecha.tilt, mecha.boosting);
+
+      // Check head contact with falling words
+      if (!gameFinished) {
+        for (let i = fallingWords.length - 1; i >= 0; i--) {
+          const w = fallingWords[i];
+          if (!w.active) continue;
+
+          // Box to Circle collision detection
+          const nearestX = Math.max(w.x, Math.min(headWorldX, w.x + w.width));
+          const nearestY = Math.max(w.y, Math.min(headWorldY, w.y + w.height));
+          const distX = headWorldX - nearestX;
+          const distY = headWorldY - nearestY;
+
+          if ((distX * distX + distY * distY) < (headRadius * headRadius)) {
+            w.active = false;
+            const hitCenterPointX = w.x + w.width / 2;
+            const hitCenterPointY = w.y + w.height / 2;
+
+            if (w.text === currentTargetWord) {
+              // DETONATION: Explode the correct word capsule and seamlessly continue flight!
+              currentScore++;
+              scoreDisplay.textContent = currentScore;
+              triggerTargetWordDetonation(hitCenterPointX, hitCenterPointY, w.text);
+              addHitPopup(headWorldX, headWorldY - 30, '+1 EXPLOSION!', '#00f6ff');
+              setNextTargetWord();
+            } else {
+              // Wrong word deflected: deflect shake & audio warning, keep playing!
+              playDeflectSound();
+              mecha.screenShake = 12;
+              addHitPopup(headWorldX, headWorldY - 25, 'WRONG TARGET!', '#f43f5e');
+            }
+          }
+        }
+      }
+
+      // Render smoke particles
+      for (let i = smokeParticles.length - 1; i >= 0; i--) {
+        const sp = smokeParticles[i];
+        sp.update();
+        sp.draw(ctx);
+        if (sp.life <= 0) smokeParticles.splice(i, 1);
+      }
+
+      // Render shockwave expanding rings
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.update();
+        sw.draw(ctx);
+        if (sw.life <= 0) shockwaves.splice(i, 1);
+      }
+
+      // Render explosion shards & text shrapnel
+      for (let i = explosionPieces.length - 1; i >= 0; i--) {
+        const ep = explosionPieces[i];
+        ep.update();
+        ep.draw(ctx);
+        if (ep.life <= 0) explosionPieces.splice(i, 1);
+      }
+
+      // Render Floating Score Popups
+      for (let i = hitPopups.length - 1; i >= 0; i--) {
+        const hp = hitPopups[i];
+        hp.y -= 1.8;
+        hp.life--;
+        ctx.save();
+        ctx.font = '900 20px "Orbitron", monospace';
+        ctx.fillStyle = hp.color || '#10b981';
+        ctx.shadowColor = hp.color || '#34d399';
+        ctx.shadowBlur = 12;
+        ctx.globalAlpha = Math.max(0, hp.life / hp.maxLife);
+        ctx.textAlign = 'center';
+        ctx.fillText(hp.text, hp.x, hp.y);
+        ctx.restore();
+        if (hp.life <= 0) hitPopups.splice(i, 1);
+      }
+
+      ctx.restore();
+      requestAnimationFrame(flightLoop);
+    }
+
+    window.addEventListener('load', () => {
+      initMission();
+      requestAnimationFrame(flightLoop);
+    });
+  </script>
+</body>
+</html>
